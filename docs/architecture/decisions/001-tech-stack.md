@@ -4,29 +4,33 @@
 **Status:** Accepted
 
 ## Context
+
 The project requires a cross-platform (Windows/Linux) personal assistant with:
-1.  **Privacy:** Local-first data and encryption.
-2.  **Extensibility:** Ability to add new skills/agents dynamically.
-3.  **Modern DX:** Strong typing and ecosystem support for rapid MVP development.
-4.  **Backend Capabilities:** Vector search, Scheduling, Auth, and Realtime updates.
-5.  **User Interface:** A ubiquitous, mobile-friendly interface without building custom mobile apps.
+
+1. **Privacy:** Local-first data and encryption.
+2. **Extensibility:** Ability to add new skills/agents dynamically.
+3. **Modern DX:** Strong typing and ecosystem support for rapid MVP development.
+4. **Backend Capabilities:** Vector search, Scheduling, Auth, and Realtime updates.
+5. **User Interface:** A ubiquitous, mobile-friendly interface without building custom mobile apps.
 
 ## Decision
+
 We have decided to use the following stack:
 
-1.  **Language:** **TypeScript (Node.js)**
-    *   *Why:* Unified language for Bot and Backend. Excellent ecosystem. Strong typing.
-2.  **Infrastructure:** **Self-Hosted Supabase (Docker)**
-    *   *Why:* Provides a "Backend-in-a-Box" replacing manual setup.
-    *   *Features Used:* `Postgres` (Data), `pgvector` (Memory), `pg_cron` (Scheduling), `Supabase Vault` (Secrets), `Realtime` (Updates).
-3.  **Communication:** **HTTP/REST (Fastify)**
-    *   *Why:* Simple, standard, debuggable. Fastify provides high performance.
-4.  **Interface:** **Telegram Bot (Telegraf)**
-    *   *Why:* Solves "Cross-Platform" (Mobile/Desktop) and "Remote Access" instantly. No need to build/distribute native UI binaries. Push notifications are built-in.
+1. **Language:** **TypeScript (Node.js)**
+    * *Why:* Unified language for Bot and Backend. Excellent ecosystem. Strong typing.
+2. **Infrastructure:** **Self-Hosted Supabase (Docker)**
+    * *Why:* Provides a "Backend-in-a-Box" replacing manual setup.
+    * *Features Used:* `Postgres` (Data), `pgvector` (Memory), `pg_cron` (Scheduling), `Supabase Vault` (Secrets), `Realtime` (Updates).
+3. **Communication:** **HTTP/REST (Fastify)**
+    * *Why:* Simple, standard, debuggable. Fastify provides high performance.
+4. **Interface:** **Telegram Bot (Telegraf)**
+    * *Why:* Solves "Cross-Platform" (Mobile/Desktop) and "Remote Access" instantly. No need to build/distribute native UI binaries. Push notifications are built-in.
 
 ## Consequences
-*   **Pros:** Immediate mobile access. No frontend code to maintain (using Telegram's UI). Supabase handles heavy lifting.
-*   **Cons:** Reliance on Telegram servers (privacy trade-off for UI, though logic remains local). Requires Docker.
+
+* **Pros:** Immediate mobile access. No frontend code to maintain (using Telegram's UI). Supabase handles heavy lifting.
+* **Cons:** Reliance on Telegram servers (privacy trade-off for UI, though logic remains local). Requires Docker.
 
 ---
 
@@ -36,17 +40,21 @@ We have decided to use the following stack:
 **Status:** Accepted
 
 ## Context
+
 The assistant needs to handle complex, vague user requests ("Plan my trip") that require multiple distinct skills (Research, Calendar, Booking).
 
 ## Decision
+
 We will implement a **Hierarchical Supervisor-Worker Pattern**.
-1.  **Supervisor:** A "Router" agent that analyzes the initial intent.
-2.  **Workers:** Specialized agents (e.g., `SchedulerAgent`, `ResearchAgent`) that possess specific tools.
-3.  **Policy Layer:** A lightweight routing model that predicts the best worker for a task based on input embeddings.
+
+1. **Supervisor:** A "Router" agent that analyzes the initial intent.
+2. **Workers:** Specialized agents (e.g., `SchedulerAgent`, `ResearchAgent`) that possess specific tools.
+3. **Policy Layer:** A lightweight routing model that predicts the best worker for a task based on input embeddings.
 
 ## Consequences
-*   **Pros:** Modular. New skills can be added as new Workers without breaking the core logic.
-*   **Cons:** Latency increased by the "Routing" step.
+
+* **Pros:** Modular. New skills can be added as new Workers without breaking the core logic.
+* **Cons:** Latency increased by the "Routing" step.
 
 ---
 
@@ -56,14 +64,18 @@ We will implement a **Hierarchical Supervisor-Worker Pattern**.
 **Status:** Accepted
 
 ## Context
+
 The assistant needs to remember user preferences (Long-term) and the current conversation context (Short-term).
 
 ## Decision
+
 We will use a **Tiered Memory System**:
-1.  **Short-Term:** Stored in a Postgres `conversations` table (structured JSON). Pruned/Summarized after N turns.
-2.  **Long-Term:** Stored in `pgvector`.
-    *   *Process:* A nightly cron job summarizes Short-Term memory and embeds it into the Long-Term vector store.
+
+1. **Short-Term:** Stored in a Postgres `conversations` table (structured JSON). Pruned/Summarized after N turns.
+2. **Long-Term:** Stored in `pgvector`.
+    * *Process:* A nightly cron job summarizes Short-Term memory and embeds it into the Long-Term vector store.
 
 ## Consequences
-*   **Pros:** Efficient retrieval. Keeps the context window clean for LLMs.
-*   **Cons:** "Nightly" consolidation means immediate learning might be delayed.
+
+* **Pros:** Efficient retrieval. Keeps the context window clean for LLMs.
+* **Cons:** "Nightly" consolidation means immediate learning might be delayed.
