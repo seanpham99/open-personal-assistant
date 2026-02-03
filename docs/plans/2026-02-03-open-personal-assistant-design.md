@@ -5,44 +5,50 @@
 **Project:** Open Personal Assistant
 
 ## 1. Executive Summary
-A privacy-first, cross-platform personal assistant designed for Windows and Linux. It features a CLI-first interface, a multi-agent swarm for specialized tasks, and a self-evolving architecture that improves performance and skill routing through feedback loops and automated maintenance.
+A privacy-first, cross-platform personal assistant designed for Windows and Linux. It features a CLI-first interface, a multi-agent swarm for specialized tasks, and a self-evolving architecture that improves performance and skill routing through feedback loops and automated maintenance. This new iteration transitions to a TypeScript-based stack powered by a self-hosted Supabase instance to leverage its robust ecosystem (Auth, Realtime, Vector Store, Cron).
 
 ## 2. System Architecture
 
 ### 2.1 Overview
-The system employs a **Daemon-Client** model:
-- **`assistant-d` (Daemon)**: A background process running a FastAPI server. It manages the agent swarm, cron engine, encrypted database, and memory.
-- **`assistant` (CLI)**: A lightweight command-line interface for user interaction.
+The system employs a **Daemon-Client** model built with TypeScript/Node.js:
+- **`assistant-d` (Daemon)**: A background process (Node.js/Fastify) acting as the brain. It interfaces with self-hosted Supabase for state, auth, and memory.
+- **`assistant` (CLI)**: A lightweight command-line interface (built with `commander` or `oclif`) that communicates with the daemon via local HTTP.
 
 ### 2.2 Agent Swarm (Multi-Agent System)
-- **Supervisor-Worker Pattern**: A central Supervisor agent receives user intent, decomposes it, and routes tasks to specialized workers (e.g., Scheduler, Note-Taker, Researcher).
-- **Dynamic Skills**: Agents can discover, install, and prune skills (tools) from `skills.sh`. 
-- **Self-Evolution**: A RAG-based routing policy (lightweight classifier) that learns from user feedback and execution metrics to improve task delegation.
+- **Supervisor-Worker Pattern**: A central Supervisor agent receives user intent, decomposes it, and routes tasks to specialized workers.
+- **Dynamic Skills**: Agents can discover and integrate tools dynamically.
+- **Self-Evolution**:
+    - **Policy Layer**: A lightweight routing model (potentially running on Edge Functions or local ONNX) predicts the best agent for a task.
+    - **Feedback Loop**: User interactions update the routing policy via Supabase Edge Functions / Database Webhooks.
 
-### 2.3 Memory System
-- **Short-Term Memory**: Conversation context and transient task states stored in a KV table within SQLite.
-- **Long-Term Memory**: User preferences, historical task data, and learned behaviors stored as vector embeddings using `sqlite-vec`.
+### 2.3 Supabase-Powered Infrastructure
+Instead of a single SQLite file, we leverage the self-hosted Supabase stack:
+- **PostgreSQL**: Primary relational store (Tasks, Logs, structured data).
+- **pgvector**: Vector store for Long-Term Memory (Embeddings).
+- **pg_cron**: Scheduling engine for maintenance and recurring tasks.
+- **pg_net / Edge Functions**: For executing skills and external API calls securely.
+- **Realtime**: For instant updates to the CLI (e.g., streaming agent thoughts).
+- **Vault**: Supabase Vault for secure storage of API keys (encryption at rest).
 
 ## 3. Data & Security
 
-### 3.1 Persistence
-- **Primary Store**: SQLite database encrypted via SQLCipher.
-- **Secure Vault**: Encrypted storage for 3rd-party API keys (Fernet encryption).
+### 3.1 Persistence & Memory
+- **Short-Term Memory**: Stored in Postgres (or Redis if needed for high throughput) for active context.
+- **Long-Term Memory**: `pgvector` stores embeddings of history, preferences, and facts.
 
-### 3.2 IPC & Security
-- **Protocol**: HTTP/1.1 (JSON) over Localhost.
-- **Authentication**: API Key-based (`X-API-Key`) with keys stored in the user's secure configuration directory.
+### 3.2 Security
+- **Authentication**: Supabase Auth (GoTrue) handles user identity. The CLI authenticates once and stores a session token.
+- **Secrets**: 3rd-party API keys are stored in **Supabase Vault**, ensuring they are encrypted at rest and only exposed to authorized Edge Functions/Agents.
 
-## 4. Automation & Maintenance (Cron Engine)
-An internal async scheduler handles:
-- **System Health**: Cache invalidation and data synchronization.
-- **Evolution**: Nightly retraining of the routing policy and summary of short-term memory into long-term vectors.
-- **Skill Lifecycle**: Automated pruning of low-usage or poor-performing skills.
+## 4. Automation & Maintenance
+- **System Health**: `pg_cron` jobs handle cache invalidation and database maintenance (VACUUM, etc.).
+- **Evolution**: Scheduled jobs analyze `skill_usage` tables to flag underperforming skills or retrain the routing policy.
 
 ## 5. Technology Stack
-- **Language**: Python 3.12+ (managed by `uv`).
-- **Web/API**: FastAPI, `httpx`.
-- **CLI**: Typer.
-- **Database**: SQLite, `sqlite-vec`, `sqlcipher3`.
-- **ML/Evolution**: Scikit-learn (Policy Layer), Sentence-Transformers (Embeddings).
-- **Validation/Tooling**: Pydantic, Ruff, Mypy.
+- **Language**: TypeScript (Node.js 20+).
+- **Runtime Manager**: `npm` / `pnpm` / `bun` (TBD - sticking to `npm` for standard compatibility).
+- **Backend/Daemon**: Fastify (or Hono) + Supabase JS Client.
+- **CLI**: Commander.js or Oclif.
+- **Database**: Self-Hosted Supabase (Postgres, GoTrue, Realtime, Storage, Vector, Vault).
+- **Validation**: Zod.
+- **Linting/Quality**: Biome (fast, modern).
